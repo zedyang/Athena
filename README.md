@@ -1,2 +1,2 @@
 # Athena
-Python analytic module for automatic trading.
+Python analytic module for automated trading.
