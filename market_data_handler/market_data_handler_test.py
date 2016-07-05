@@ -119,7 +119,7 @@ test_data_longer_single_instrument = [
         'md_backtest:000':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:00:00',
+                'LOCAL_TIME': '2015-10-08 09:00:00.0',
                 'MD_SUBTYPE': 'BID',
                 'PRICE': '10',
                 'VOLUME': '105'
@@ -129,7 +129,7 @@ test_data_longer_single_instrument = [
         'md_backtest:001':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:00:00',
+                'LOCAL_TIME': '2015-10-08 09:00:00.0',
                 'MD_SUBTYPE': 'ASK',
                 'PRICE': '10.5',
                 'VOLUME': '100'
@@ -139,7 +139,7 @@ test_data_longer_single_instrument = [
         'md_backtest:002':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:00:26',
+                'LOCAL_TIME': '2015-10-08 09:00:26.0',
                 'MD_SUBTYPE': 'BID',
                 'PRICE': '10.3',
                 'VOLUME': '130'
@@ -149,7 +149,7 @@ test_data_longer_single_instrument = [
         'md_backtest:003':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:00:26',
+                'LOCAL_TIME': '2015-10-08 09:00:26.0',
                 'MD_SUBTYPE': 'ASK',
                 'PRICE': '10.8',
                 'VOLUME': '90'
@@ -159,7 +159,7 @@ test_data_longer_single_instrument = [
         'md_backtest:004':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:01:02',
+                'LOCAL_TIME': '2015-10-08 09:01:02.0',
                 'MD_SUBTYPE': 'BID',
                 'PRICE': '10.2',
                 'VOLUME': '90'
@@ -169,7 +169,7 @@ test_data_longer_single_instrument = [
         'md_backtest:005':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:01:02',
+                'LOCAL_TIME': '2015-10-08 09:01:02.0',
                 'MD_SUBTYPE': 'ASK',
                 'PRICE': '10.7',
                 'VOLUME': '95'
@@ -179,7 +179,7 @@ test_data_longer_single_instrument = [
         'md_backtest:006':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:01:33',
+                'LOCAL_TIME': '2015-10-08 09:01:33.0',
                 'MD_SUBTYPE': 'BID',
                 'PRICE': '10.8',
                 'VOLUME': '120'
@@ -189,7 +189,7 @@ test_data_longer_single_instrument = [
         'md_backtest:007':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:01:33',
+                'LOCAL_TIME': '2015-10-08 09:01:33.0',
                 'MD_SUBTYPE': 'ASK',
                 'PRICE': '11.3',
                 'VOLUME': '115'
@@ -199,7 +199,7 @@ test_data_longer_single_instrument = [
         'md_backtest:008':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:01:50',
+                'LOCAL_TIME': '2015-10-08 09:01:50.0',
                 'MD_SUBTYPE': 'BID',
                 'PRICE': '10.6',
                 'VOLUME': '80'
@@ -209,7 +209,7 @@ test_data_longer_single_instrument = [
         'md_backtest:009':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:01:50',
+                'LOCAL_TIME': '2015-10-08 09:01:50.0',
                 'MD_SUBTYPE': 'ASK',
                 'PRICE': '11.1',
                 'VOLUME': '85'
@@ -219,7 +219,7 @@ test_data_longer_single_instrument = [
         'md_backtest:010':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:02:03',
+                'LOCAL_TIME': '2015-10-08 09:02:03.0',
                 'MD_SUBTYPE': 'BID',
                 'PRICE': '10',
                 'VOLUME': '80'
@@ -229,7 +229,7 @@ test_data_longer_single_instrument = [
         'md_backtest:011':
             {
                 'SECURITY': 'au1606',
-                'LOCAL_TIME': '2015-10-08 09:02:03',
+                'LOCAL_TIME': '2015-10-08 09:02:03.0',
                 'MD_SUBTYPE': 'ASK',
                 'PRICE': '10.5',
                 'VOLUME': '85'

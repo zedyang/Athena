@@ -155,7 +155,7 @@ class TickDataHandler(MarketDataHandler):
             if flag == 0:
                 break
             # sleep and continue.
-            time.sleep(self.streaming_interval)
+            # time.sleep(self.streaming_interval)
 
 
 

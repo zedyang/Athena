@@ -57,7 +57,7 @@ class AthenaConfig(object):
     # timestamp column name
     ATHENA_SQL_TABLE_FIELD_DATETIME = ATHENA_SQL_TABLE_HEADERS_TICK[3]
     # timestamp column format
-    ATHENA_SQL_DT_FORMAT = '%Y-%m-%d %H:%M:%S'
+    ATHENA_SQL_DT_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
     # bid ask column name
     ATHENA_SQL_TABLE_FIELD_SUBTYPE = ATHENA_SQL_TABLE_HEADERS_TICK[5]
     ATHENA_SQL_TABLE_FIELD_PRICE = ATHENA_SQL_TABLE_HEADERS_TICK[6]
