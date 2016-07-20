@@ -24,6 +24,13 @@ class TestPortfolioBasic(unittest.TestCase):
             {'S1': 11, 'S2': 11},
         ]
 
+        self.md_data = [
+            {'contract': 'S1', 'ask': 10, 'bid': 10, 'tag':'md'},
+            {'contract': 'S1', 'ask': 11, 'bid': 11, 'tag':'md'},
+            {'contract': 'S1', 'ask': 12, 'bid': 12, 'tag':'md'},
+            {'contract': 'S1', 'ask': 13, 'bid': 13, 'tag':'md'}
+        ]
+
     def test_my_portfolio_market_1(self):
         market_prices = self.market_prices_1
         # >> buy 100 shares S1 at $10, commission $1
@@ -89,6 +96,21 @@ class TestPortfolioBasic(unittest.TestCase):
         self.assertEqual(s['S2'], 0)
         self.assertEqual(s['equity'], 10992)
         self.assertEqual(self.my_portfolio.realized_pnl, 992)
+
+    def test_my_portfolio_market_2(self):
+        self.my_portfolio.on_message(self.md_data[0])
+        self.my_portfolio.on_message(self.md_data[1])
+        self.my_portfolio.on_message(
+            {
+                'contract': 'S1',
+                'direction': 'long',
+                'quantity': 100,
+                'commission': 0,
+                'tag': 'order'
+            }
+        )
+        self.my_portfolio.on_message(self.md_data[2])
+        self.my_portfolio.on_message(self.md_data[3])
 
 
 class TestPortfolioBorrowing(unittest.TestCase):

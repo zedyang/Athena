@@ -14,14 +14,14 @@ class PositionDirection(Enum):
 class Position(object):
     """
     Position class. This class encapsulates the data related to one specific
-    position (one ticker). It records all BOT\SLD actions and associated prices
+    position (one instrument). It records all BOT\SLD actions and associated prices
     and tracks the PnL on this instrument.
     """
-    def __init__(self, ticker, direction,
+    def __init__(self, instrument, direction,
                  init_quantity, init_price, init_commission):
         """
         Create the position object.
-        :param ticker: The name of instrument
+        :param instrument: The name of instrument
         :param direction: The direction of initial trade,
             a PositionDirection object.
         :param init_quantity: The quantity associated with initial position.
@@ -42,7 +42,7 @@ class Position(object):
         * net = bought - sold, long position is positive.
         * net_total = total_sold - total_bought, cash inflow is positive.
         """
-        self.ticker = ticker
+        self.instrument = instrument
         self.direction = direction
         self.quantity = init_quantity # make positive temporarily,
         # in the end it will have correct sign.

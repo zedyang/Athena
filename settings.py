@@ -1,3 +1,5 @@
+from Athena.utils import map_to_kl_dir, map_to_md_dir, create_equiv_classes
+
 __author__ = 'zed'
 
 
@@ -15,93 +17,250 @@ class AthenaConfig(object):
 
     # The following section is to configure MS SQL server connection
     # ---------------------------------------------------------------------
-    # the host name
-    ATHENA_SQL_HOST_NAME = '127.0.0.1'
-    # the port
-    ATHENA_SQL_PORT = 1433
-    # login name for SQL server authentication
-    ATHENA_SQL_LOGIN_NAME = 'intern_01'
-    # password for SQL server authentication
-    ATHENA_SQL_LOGIN_PWD = '123456'
-    # name of the database that saves historical market data.
-    ATHENA_SQL_DB_NAME = 'db_1'
+    sql_host = '127.0.0.1'
+    sql_port = 1433
+    sql_usr = 'intern_01'
+    sql_pwd = '123456'
 
-    # The following section is to configure Redis database connection.
-    # ---------------------------------------------------------------------
-    ATHENA_REDIS_HOST_NAME = '127.0.0.1'   # the host name
-    ATHENA_REDIS_PORT = 6379               # the port
+    sql_historical_db = 'Athena_test_db'
+    sql_test_table = 'md160713'
 
-    # The following section lists SQL Server table names.
-    # ---------------------------------------------------------------------
-    ATHENA_SQL_TABLE_NAME_TICK = 'tick_history'
-    ATHENA_SQL_TABLE_NAME_BAR_1M = 'one_minute_history'
-    # TODO: finish this for all tables (Zed, 2016-07-02)
+    class TickFields(object):
+        # proper headers of tick data used in Athena (Python PEP-8)
+        tick_headers = (
+            'trade_day', 'ex_update_time', 'local_update_time', 'category',
+            'contract', 'last_price', 'bid', 'bid_vol', 'ask', 'ask_vol',
+            'average_price', 'highest_price', 'lowest_price', 'pre_close',
+            'open_interest', 'volume'
+        )
+        (day, ex_time, local_time, category, contract, last_price,
+         bid, bid_vol, ask, ask_vol, avg_price, high_price, low_price,
+         pre_close, open_int, volume) = tick_headers
 
-    # The following section is to let Athena know data formatting/structure
-    # in SQL Server
-    # ---------------------------------------------------------------------
-    # the headers (column names) of tick tables in SQL server.
-    ATHENA_SQL_TABLE_HEADERS_TICK = (
-        'SECURITY', 'DATE', 'TIME', 'LOCAL_TIME', 'MD_TYPE',
-        'MD_SUBTYPE', 'PRICE', 'VOLUME', 'VALUE')
+    class KLineFields(object):
+        # proper headers of kline data used in Athena (Python PEP-8)
+        kline_headers = (
+            'ex_open_time', 'open_time', 'end_time',
+            'contract', 'open', 'high', 'low', 'close', 'volume',
+            'open_interest', 'duration', 'duration_specifier', 'count'
+        )
+        (ex_open_time, open_time, end_time, contract,
+         open_price, high_price, low_price, close_price, volume,
+         open_int, duration, duration_specifier, count) = kline_headers
 
-    # the headers (column names) of bar tables in SQL server
-    ATHENA_SQL_TABLE_HEADERS_BAR = (
-        'SECURITY', 'DATE', 'TIME', 'LOCAL_TIME',
-        'OPEN_PRICE', 'HIGH_PRICE', 'LOW_PRICE', 'CLOSE_PRICE',
-        'VOLUME', 'VALUE'
-    )
+    dt_format = '%Y-%m-%d %H:%M:%S'
+    sql_storage_dt_format = '%Y-%m-%d %H:%M:%S.%f'
 
-    # instrument column name
-    ATHENA_SQL_TABLE_FIELD_INSTRUMENT = ATHENA_SQL_TABLE_HEADERS_TICK[0]
-    # timestamp column name
-    ATHENA_SQL_TABLE_FIELD_DATETIME = ATHENA_SQL_TABLE_HEADERS_TICK[3]
-    # timestamp column format
-    ATHENA_SQL_DT_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
-    # bid ask column name
-    ATHENA_SQL_TABLE_FIELD_SUBTYPE = ATHENA_SQL_TABLE_HEADERS_TICK[5]
-    ATHENA_SQL_TABLE_FIELD_PRICE = ATHENA_SQL_TABLE_HEADERS_TICK[6]
-    ATHENA_SQL_TABLE_FIELD_VOLUME = ATHENA_SQL_TABLE_HEADERS_TICK[7]
-
-    # The following section lists all available instrument names in SQL server.
-    # ---------------------------------------------------------------------
-    ATHENA_SQL_INSTRUMENTS = (
+    sql_instruments_list = [
+        'ag1607',
+        'ag1608',
+        'ag1609',
+        'ag1610',
+        'ag1611',
+        'ag1612',
+        'ag1701',
+        'ag1702',
+        'ag1703',
+        'ag1704',
+        'ag1705',
+        'ag1706'
         'Au(T+D)',
         'mAu(T+D)'
         'Au(T+N1)',
         'Au(T+N2)',
-        'au1512',
-        'au1606',
-        'Au9995',
-        'Au9999',
-        'AUAM5',
-        'AUAZ5',
-        'AUAM5 Comdty',
-        'EURUSD BGNL Cumcy',
-        'JPYUSD BGNL Cumcy',
-        'XAUUSD BGNL Cumcy',
-        'IFB1',
-        'GC1 Comdty',
-        'SHGFAUTD Comdty',
-        'SHGFAUTD Index'
+        'au1612',
+        'au1706',
+        'Au99.95',
+        'Au99.99'
+    ]
+
+    # The following section is to configure Redis database connection.
+    # ---------------------------------------------------------------------
+    redis_host = '127.0.0.1'
+    redis_port = 6379
+
+    hist_stream_db_index = 3
+    athena_db_index = 1
+    daily_migration_cache_db_index = 10
+
+    redis_md_dir = 'md:md_backtest'
+    redis_temp_hist_stream_dir = 'temp_stream:hermes'
+
+    redis_md_max_records = 1e9
+    redis_key_max_digits = 9
+    redis_md_end_flag = 'md_end'
+
+    # The following section is to configure Hermes raw data stream
+    # ---------------------------------------------------------------------
+    class HermesTickFields(object):
+        # headers of hermes raw tick data.
+        hermes_tick_headers = (
+            'day', 'systime', 'subtime', 'lastprice',
+            'volume', 'openinterest', 'bid1', 'bidvol1', 'ask1', 'askvol1'
+        )
+        (day, ex_time, local_time, last_price,
+         volume, open_int, bid, bid_vol, ask, ask_vol) = hermes_tick_headers
+
+    class HermesKLineFields(object):
+        # headers of hermes raw k-line data
+        hermes_kline_headers = (
+            'openwndtime', 'opensystime', 'dur', 'open', 'close',
+            'high', 'low', 'volume', 'openinterest'
+        )
+        (open_time, ex_open_time, duration, open_price, close_price,
+         high_price, low_price, volume, open_int) = hermes_kline_headers
+
+    # duration specifiers
+    hermes_kl_dur = ['clock', '1m', '3m', '5m', '10m', '15m']
+    hermes_kl_dur_to_seconds = {
+        'clock': 3,
+        '1m': 60,
+        '3m': 180,
+        '5m': 300,
+        '10m': 600,
+        '15m': 900
+    }
+
+    # the inverse mapping
+    hermes_kl_seconds_to_dur = dict()
+    for k,v in hermes_kl_dur_to_seconds.items():
+        hermes_kl_seconds_to_dur[v] = k
+
+    class HermesMdDirectory(object):
+        # Data directory prefix of different hermes md APIs.
+        ksd_md = 'md.ksdreal.'
+        ksd_kl = 'kl.ksdreal.'
+        nanhua_md = 'md.nanhua.'
+        nanhua_kl = 'kl.nanhua.'
+        ctp_md = 'md.ctpnow.'
+        ctp_kl = 'kl.ctpnow.'
+
+    class HermesInstrumentsList(object):
+        # Instrument list that is included in different APIs
+        ksd = [
+            'Ag(T+D)',
+            'Ag99.9',
+            'Ag99.99',
+            'Au(T+D)',
+            'Au(T+N1)',
+            'Au(T+N2)',
+            'mAu(T+D)',
+            'Au100g',
+            'Au50g',
+            'Au99.95',
+            'Au99.99',
+            'Au99.5',
+            'iAu100g',
+            'iAu99.5',
+            'iAu99.99'
+        ]
+
+        ctp = [
+            'au1608',
+            'au1609',
+            'au1610',
+            'au1611',
+            'au1612',
+            'au1701',
+            'au1702',
+            'au1703',
+            'au1704',
+            'au1705',
+            'au1706',
+            'ag1608',
+            'ag1609',
+            'ag1610',
+            'ag1611',
+            'ag1612',
+            'ag1701',
+            'ag1702',
+            'ag1703',
+            'ag1704',
+            'ag1705',
+            'ag1706'
+        ]
+
+        uft = ctp
+
+        nanhua = [
+            'GC1608',
+            'GC1609',
+            'GC1610',
+            'GC1611',
+            'GC1612',
+            'GC1701',
+            'GC1702',
+            'GC1703',
+            'GC1704',
+            'GC1705',
+            'GC1706'
+        ]
+
+        ag = [
+            'Ag(T+D)',
+            'Ag99.9',
+            'Ag99.99',
+            'ag1608',
+            'ag1609',
+            'ag1610',
+            'ag1611',
+            'ag1612',
+            'ag1701',
+            'ag1702',
+            'ag1703',
+            'ag1704',
+            'ag1705',
+            'ag1706'
+        ]
+
+        all = ctp + ksd + nanhua
+
+    # create instrument symbol -> md and kline data directory mapping.
+    associative_list_md = (
+        (HermesInstrumentsList.ctp, HermesMdDirectory.ctp_md),
+        (HermesInstrumentsList.ksd, HermesMdDirectory.ksd_md),
+        (HermesInstrumentsList.nanhua, HermesMdDirectory.nanhua_md)
     )
 
-    # The following section specifies which cache field (database index)
-    # in Redis is to save * type of data.
-    # ---------------------------------------------------------------------
-    ATHENA_REDIS_MD_DB_INDEX = 0       # market data: db0
-    ATHENA_REDIS_SIGNAL_DB_INDEX = 3   # signals: db3
+    # md directory mapping
+    hermes_md_mapping = map_to_md_dir(associative_list_md)
 
-    # The following section set the name of directories in Redis
-    # ---------------------------------------------------------------------
-    ATHENA_REDIS_MD_DIR = 'md_backtest'
+    associative_list_kl = (
+        (HermesInstrumentsList.ctp, HermesMdDirectory.ctp_kl),
+        (HermesInstrumentsList.ksd, HermesMdDirectory.ksd_kl),
+        (HermesInstrumentsList.nanhua, HermesMdDirectory.nanhua_kl)
+    )
 
-    # The following specified maximum counts of historical records
-    # stored in redis
+    # kline directory mapping.
+    hermes_kl_mapping = dict()
+    for dur in hermes_kl_dur:
+        hermes_kl_mapping[dur] = map_to_kl_dir(associative_list_kl, dur)
+
+    # create instrument symbol -> exchange mapping.
+    associative_list_exchange = (
+        (HermesInstrumentsList.ctp, 'SHFE'),
+        (HermesInstrumentsList.ksd, 'SGE'),
+        (HermesInstrumentsList.nanhua, 'CME')
+    )
+    hermes_exchange_mapping = create_equiv_classes(associative_list_exchange)
+
+    # create instrument symbol -> category mapping
+    hermes_category_mapping = dict()
+    for symbol in HermesInstrumentsList.all:
+        if symbol in HermesInstrumentsList.ag:
+            hermes_category_mapping[symbol] = 'ag'
+        else:
+            hermes_category_mapping[symbol] = 'au'
+
+    hermes_db_index = 0
+    hermes_md_sep_char = '|'
+
+    # The following section is to configure Athena dictionary data structure.
     # ---------------------------------------------------------------------
-    ATHENA_REDIS_MD_MAX_RECORDS = 1e9       # maximum # of records
-    ATHENA_REDIS_MD_MAX_DIGITS = 9          # # of dights
-    ATHENA_REDIS_MD_END_FLAG = 'md_end'     # the flag marks end of md records
+    class AthenaMessageTypes(object):
+        # value of tag field in athena db's dict data
+        md = 'md'
+        kl = 'kl'
 
     @staticmethod
     def redis_historical_md_dir(instrument_list, begin, end):
@@ -112,18 +271,24 @@ class AthenaConfig(object):
         :param end: datetime.datetime object
         :return:
         """
-        begin_str = begin.strftime(AthenaConfig.ATHENA_SQL_DT_FORMAT)
-        end_str = end.strftime(AthenaConfig.ATHENA_SQL_DT_FORMAT)
-        return AthenaConfig.ATHENA_REDIS_MD_DIR + '_({})_{}_{}'.format(
+        begin_str = begin.strftime(AthenaConfig.dt_format)
+        end_str = end.strftime(AthenaConfig.dt_format)
+        return AthenaConfig.redis_md_dir + '_({})_{}_{}'.format(
             ','.join(instrument_list), begin_str, end_str)
 
-    @staticmethod
-    def show():
-        print('----------------------------------------------')
-        print('|            Athena Configurations           |')
-        print('----------------------------------------------')
-    # TODO: finish this prompt when all config items are specified.
 
-if __name__ == '__main__':
-    print(vars(AthenaConfig()))
-    AthenaConfig.show()
+class AthenaProperNames(object):
+    """
+    A list of proper names that are frequently used in this module.
+    """
+    long = 'long'
+    short = 'short'
+
+    bid = 'bid'
+    ask = 'ask'
+
+    md_message_type = 'md'
+    order_message_type = 'order'
+    signal_message_type = 'signal'
+    portfolio_message_type = 'portfolio'
+

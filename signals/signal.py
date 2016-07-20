@@ -2,33 +2,33 @@ import json
 from abc import ABCMeta, abstractmethod
 
 from Athena.settings import AthenaConfig
-from Athena.apis.database_api import RedisAPI
+from Athena.db_wrappers.redis_wrapper import RedisWrapper
+from Athena.utils import append_digits_suffix_for_redis_key
 
 __author__ = 'zed'
 
 
+# -----------------------------------------------------------------------
 class Signal(object):
     """
     The abstract signal class, provides interfaces to all derived signal
     types. A signal will open one or more connections to the redis database.
 
-    It subscribes to some channels (md, other signal or portfolio)
-    according to its subtype. For example, a SingleInstrumentSignal will
-    only listens to one channel: market data of the instrument it is tracking.
+    A signal model essentially subscribe and publish from/to some channels.
+    For example, a single instrument signal will only listens to one channel:
+    market data of the instrument it is tracking.
 
-    when receiving a message on the listening channel, it execute the main
-    logic in on_message() method. Signal can have more than one logical call
-    backs according to the type/channel that the message is belongs to.
+    on_message() is a callback function that is executed every time receiving
+    a message on the listening channels. It will examine the type of
+    messages and branches to execute corresponding internal logic.
 
-    Concrete Signal classes should also implement key_in_redis() method to
-    map to a key so as to write record into redis.
-    publish_message method is to write this hash set and publish message in
-    its own channel that other message/strategy might listens to.
+    __publish() method is to write this hash set and publish message in
+    its own channel that other entities might listens to.
     """
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __connect(self):
+    def __subscribe(self, channels):
         """
 
         :return:
@@ -36,26 +36,10 @@ class Signal(object):
         raise NotImplementedError
 
     @abstractmethod
-    def __subscribe_instruments(self):
+    def _publish(self, data):
         """
 
-        :return:
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def key_in_redis(self):
-        """
-
-        :return:
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def publish_message(self, dict_message_data):
-        """
-
-        :param dict_message_data:
+        :param data:
         :return:
         """
         raise NotImplementedError
@@ -70,67 +54,47 @@ class Signal(object):
         raise NotImplementedError
 
 
-class SingleInstrumentSignal(Signal):
+# -----------------------------------------------------------------------
+class SignalTemplate(Signal):
     """
-    Implementation of Signal object that subscribe only one instrument.
-    i.e. one market data ticker.
-    The pub channel is signal_name + '_' + 'instrument'
-    and the sub channel is just instrument.
+    Template class that implements general methods that is used in all
+    derived signals commonly. The customized signal class should inherit
+    SignalTemplate.
 
-    The class inherits SingleInstrument signal must reset signal_name
-    and pub_channel.
+    The signal object is only running on athena db, hence it suffices to
+    open one connection.
     """
 
-    def __init__(self, instrument):
+    def __init__(self, sub_channels):
         """
         constructor.
-        :param instrument: the market ticker that the signal listens to.
         """
-        self.signal_name = 'abstract_single'
-        self.instrument = instrument
+        # open connection to redis server.
+        self.redis_wrapper = RedisWrapper(db=AthenaConfig.athena_db_index)
 
-        self.digits = AthenaConfig.ATHENA_REDIS_MD_MAX_DIGITS
+        # create a listener
+        self.sub = self.redis_wrapper.connection.pubsub()
+        self.sub_channels = sub_channels
+        self.sub_names = [c.replace(':', '.') for c in sub_channels]
+
+        # set signal name and publishing channels,
+        # these MUST be reset in derived signals.
+        self.tag = 'abstract'
+        self.signal_name = 'signal:abstract'
+        self.pub_channel = self.signal_name
+        self.pub_channel_plot = 'plot:' + self.pub_channel
+
+        # set counter to make redis keys
         self.counter = 0
-        self.__connect()
-        self.__subscribe_instruments()
 
-        # set the name of pub channels
-        self.pub_channel = self.signal_name + instrument
+        self.__subscribe(sub_channels)
 
-    def __connect(self):
+    def __subscribe(self, channels):
         """
-        connect to two redis api. One is to listen to market data,
-        another is to write calculate signal in redis.
-        These two connections target to different data bases. Specified
+
         :return:
         """
-        # the connection that subscribes market data.
-        self.md_api = RedisAPI(db=AthenaConfig.ATHENA_REDIS_MD_DB_INDEX)
-
-        # the connection that publishes signal
-        self.signal_api = RedisAPI(
-            db=AthenaConfig.ATHENA_REDIS_SIGNAL_DB_INDEX)
-
-    def __subscribe_instruments(self):
-        """
-        subscribe some instrument by listening to the channel in Redis.
-        :return:
-        """
-        # create a sub.
-        self.sub = self.md_api.connection.pubsub()
-        # channel directory (set in MarketDataHandler
-        sub_channel = self.instrument
-        self.sub.subscribe(sub_channel)
-
-    def key_in_redis(self):
-        """
-        map to key string in Redis
-        :return:
-        """
-        the_key = self.signal_name + '_' + self.instrument + ':' + \
-                  (self.digits - len(str(self.counter))) * '0' + \
-                  str(self.counter)
-        return the_key
+        self.sub.subscribe(channels)
 
     def start(self):
         """
@@ -142,25 +106,53 @@ class SingleInstrumentSignal(Signal):
                 dict_data = json.loads(str_data)
                 self.on_message(list(dict_data.values())[0])
 
-    def publish_message(self, dict_message_data):
+    def _publish(self, data):
         """
-        set hash table in redis and publish message in its own channel.
-        The name of channel is just self.signal_name
-        :param dict_message_data: dictionary, the data to be published
+        publish data into redis db.
+        :param data:
         :return:
         """
-        # create hash set object in redis.
-        published_key = self.key_in_redis()
-        self.signal_api.set_dict(published_key, dict_message_data)
-
-        # serialize json dict to string.
-        published_message = json.dumps({published_key: dict_message_data})
-
-        # publish the message to support other subscriber.
-        self.signal_api.connection.publish(
-            channel=self.pub_channel,
-            message=published_message
+        # map to new key in Athena db.
+        athena_unique_key = append_digits_suffix_for_redis_key(
+            prefix=self.pub_channel,
+            counter=self.counter,
         )
+
+        # append tag field to dict data
+        if self.tag:
+            data['tag'] = self.tag
+
+        # publish dict data
+        self.redis_wrapper.set_dict(athena_unique_key, data)
+
+        # publish str message
+        # first serialize json dict to string.
+        message = json.dumps({athena_unique_key: data})
+        self.redis_wrapper.connection.publish(
+            channel=self.pub_channel,
+            message=message
+        )
+
+        # publish plotting data
+
+        # map to new key in Athena db (plotting)
+        athena_unique_key_plotting = append_digits_suffix_for_redis_key(
+            prefix=self.pub_channel_plot,
+            counter=self.counter,
+        )
+
+        # publish plotting (dict) data.
+        self.redis_wrapper.set_dict(athena_unique_key_plotting, data)
+
+        # publish plotting str message
+        plot_message = json.dumps({athena_unique_key_plotting: data})
+        self.redis_wrapper.connection.publish(
+            channel=self.pub_channel_plot,
+            message=plot_message
+        )
+
+        # increment to counter
+        self.counter += 1
 
     def on_message(self, message):
         """
@@ -171,20 +163,22 @@ class SingleInstrumentSignal(Signal):
         pass
 
 
-class NaiveSingleInstrumentSignal(SingleInstrumentSignal):
+class NaiveSignal(SignalTemplate):
     """
-    A testing implementation of single instrument signal.
+    A testing implementation of signal.
     """
 
-    def __init__(self, instrument):
+    def __init__(self, sub_channels):
         """
         constructor.
         """
-        super(NaiveSingleInstrumentSignal, self).__init__(instrument)
+        super(NaiveSignal, self).__init__(sub_channels)
 
         # reset signal name and pub channel
-        self.signal_name = 'naive_test_single'
-        self.pub_channel = self.signal_name + instrument
+        self.tag = 'naive'
+        self.signal_name = 'signal:naive'
+        self.pub_channel = self.signal_name
+        self.pub_channel_plot = 'plot:' + self.pub_channel
 
     def on_message(self, message):
         """
@@ -193,6 +187,5 @@ class NaiveSingleInstrumentSignal(SingleInstrumentSignal):
         :param message:
         :return:
         """
-        self.publish_message(message)
-        self.counter += 1
+        self._publish(message)
 
