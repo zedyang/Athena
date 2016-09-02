@@ -2,7 +2,7 @@ import json
 from abc import ABCMeta, abstractmethod
 
 from Athena.settings import AthenaConfig
-from Athena.db_wrappers.redis_wrapper import RedisWrapper
+from Athena.data_handler.redis_wrapper import RedisWrapper
 from Athena.utils import append_digits_suffix_for_redis_key
 
 __author__ = 'zed'
@@ -28,7 +28,7 @@ class Signal(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __subscribe(self, channels):
+    def _map_to_channels(self, param_list):
         """
 
         :return:
@@ -36,7 +36,7 @@ class Signal(object):
         raise NotImplementedError
 
     @abstractmethod
-    def _publish(self, data):
+    def publish(self, data):
         """
 
         :param data:
@@ -64,37 +64,53 @@ class SignalTemplate(Signal):
     The signal object is only running on athena db, hence it suffices to
     open one connection.
     """
+    signal_name_prefix = 'signal:template'
+    param_names = ['abstract']
 
-    def __init__(self, sub_channels):
+    def __init__(self, subscribe_list, duplicate=1):
         """
         constructor.
         """
-        # open connection to redis server.
-        self.redis_wrapper = RedisWrapper(db=AthenaConfig.athena_db_index)
-
-        # create a listener
-        self.sub = self.redis_wrapper.connection.pubsub()
-        self.sub_channels = sub_channels
-        self.sub_names = [c.replace(':', '.') for c in sub_channels]
-
-        # set signal name and publishing channels,
-        # these MUST be reset in derived signals.
-        self.tag = 'abstract'
-        self.signal_name = 'signal:abstract'
-        self.pub_channel = self.signal_name
-        self.pub_channel_plot = 'plot:' + self.pub_channel
-
-        # set counter to make redis keys
+        self.subscribe_list = subscribe_list
+        self.plot_duplicates = duplicate
         self.counter = 0
 
-        self.__subscribe(sub_channels)
+        # open connection to redis server.
+        self.redis_wrapper = RedisWrapper(db=AthenaConfig.athena_db_index)
+        # create a listener
+        self.sub = self.redis_wrapper.connection.pubsub()
+        # subscribe channels in the list
+        self.sub.subscribe(self.subscribe_list)
+        self.sub.subscribe('flags')
 
-    def __subscribe(self, channels):
+        self.tag = 'abstract'
+
+    def _map_to_channels(self, param_list, suffix=None, full_name=False):
         """
 
+        :param param_list:
+        :param suffix:
+        :param full_name:
         :return:
         """
-        self.sub.subscribe(channels)
+        self.param_dict = dict(zip(self.param_names, param_list))
+
+        # map to names of publishing channels
+        self.pub_channel = self.signal_name_prefix
+        if suffix:
+            self.pub_channel = self.pub_channel + '.' + suffix
+        if full_name:
+            self.pub_channel = self.pub_channel + '.' + str(param_list)
+        self.signal_name = self.pub_channel
+
+        if self.plot_duplicates == 1:
+            self.plot_data_channel = 'plot:' + self.pub_channel
+        else:
+            self.plot_data_channel = []
+            for i in range(self.plot_duplicates):
+                self.plot_data_channel.append(
+                    'plot_{}:'.format(i) + self.pub_channel
+                )
 
     def start(self):
         """
@@ -104,12 +120,20 @@ class SignalTemplate(Signal):
             if message['type'] == 'message':
                 str_data = message['data'].decode('utf-8')
                 dict_data = json.loads(str_data)
-                self.on_message(list(dict_data.values())[0])
+                d = list(dict_data.values())[0]
 
-    def _publish(self, data):
+                # operations on flags
+                if d['tag'] == 'flag':
+                    if d['type'] == 'flag_0':
+                        return
+                else:
+                    self.on_message(d)
+
+    def publish(self, data, plot=True):
         """
-        publish data into redis db.
+
         :param data:
+        :param plot:
         :return:
         """
         # map to new key in Athena db.
@@ -134,22 +158,53 @@ class SignalTemplate(Signal):
         )
 
         # publish plotting data
+        if plot:
+            if type(self.plot_data_channel) == str:
+                # map to new key in Athena db (plotting)
+                athena_unique_key_plotting = \
+                    append_digits_suffix_for_redis_key(
+                        prefix=self.plot_data_channel,
+                        counter=self.counter,
+                    )
 
-        # map to new key in Athena db (plotting)
-        athena_unique_key_plotting = append_digits_suffix_for_redis_key(
-            prefix=self.pub_channel_plot,
-            counter=self.counter,
-        )
+                # publish plotting (dict) data.
+                self.redis_wrapper.set_dict(athena_unique_key_plotting, data)
 
-        # publish plotting (dict) data.
-        self.redis_wrapper.set_dict(athena_unique_key_plotting, data)
+                # publish plotting str message
+                plot_message = json.dumps({athena_unique_key_plotting: data})
+                self.redis_wrapper.connection.publish(
+                    channel=self.plot_data_channel,
+                    message=plot_message
+                )
 
-        # publish plotting str message
-        plot_message = json.dumps({athena_unique_key_plotting: data})
-        self.redis_wrapper.connection.publish(
-            channel=self.pub_channel_plot,
-            message=plot_message
-        )
+            elif type(self.plot_data_channel) == list:
+                for i in range(len(self.plot_data_channel)):
+                    this_plot_data_channel = self.plot_data_channel[i]
+                    # map to new key in Athena db (plotting)
+                    athena_unique_key_plotting = \
+                        append_digits_suffix_for_redis_key(
+                            prefix=this_plot_data_channel,
+                            counter=self.counter,
+                        )
+
+                    # publish plotting (dict) data.
+                    self.redis_wrapper.set_dict(
+                        athena_unique_key_plotting, data
+                    )
+
+                    # publish plotting str message
+                    plot_message = json.dumps(
+                        {athena_unique_key_plotting: data}
+                    )
+                    self.redis_wrapper.connection.publish(
+                        channel=this_plot_data_channel,
+                        message=plot_message
+                    )
+
+        # update the one record for storing last signal
+        # note that this 'current' can only be retrieved subjectively
+        athena_unique_key_current = self.pub_channel + ':0'
+        self.redis_wrapper.set_dict(athena_unique_key_current, data)
 
         # increment to counter
         self.counter += 1
@@ -167,18 +222,17 @@ class NaiveSignal(SignalTemplate):
     """
     A testing implementation of signal.
     """
+    signal_name_prefix = 'signal:naive'
+    param_names = ['foo', 'bar']
 
-    def __init__(self, sub_channels):
+    def __init__(self, subscribe_list, param_list):
         """
         constructor.
         """
-        super(NaiveSignal, self).__init__(sub_channels)
+        super(NaiveSignal, self).__init__(subscribe_list)
+        self._map_to_channels(param_list)
 
-        # reset signal name and pub channel
         self.tag = 'naive'
-        self.signal_name = 'signal:naive'
-        self.pub_channel = self.signal_name
-        self.pub_channel_plot = 'plot:' + self.pub_channel
 
     def on_message(self, message):
         """
@@ -187,5 +241,5 @@ class NaiveSignal(SignalTemplate):
         :param message:
         :return:
         """
-        self._publish(message)
+        self.publish({'foo': self.counter})
 

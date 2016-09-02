@@ -3,7 +3,8 @@ import json
 from Athena.settings import AthenaConfig, AthenaProperNames
 from Athena.utils import append_digits_suffix_for_redis_key
 from Athena.portfolio.position import Position, PositionDirection
-from Athena.data_handler.redis_wrapper import RedisWrapper
+from Athena.db_wrappers.redis_wrapper import RedisWrapper
+Tf = AthenaConfig.TickFields
 
 __author__ = 'zed'
 
@@ -15,18 +16,15 @@ class Portfolio(object):
     It adds/modifies positions when asked to, and export portfolio state,
     that is, equity/cash level. It also calculates total PnL of the account.
     """
-    def __init__(self, instruments_list, init_cash, strategy_channels=None):
+    def __init__(self, instruments_list, init_cash=10000):
         """
         Constructor.
         :param instruments_list: the tickers that will be included
         in portfolio.
         :param init_cash: initial cash level.
-        :param strategy_channels: buy/sell signal channels to subscribe.
         :return:
         """
         self.instruments_list = instruments_list
-        self.strategy_channels = strategy_channels
-        self.pub_channel = 'portfolio'
 
         self.init_cash = init_cash
         self.cash = init_cash  # current cash level.
@@ -38,106 +36,13 @@ class Portfolio(object):
         for instrument in self.instruments_list:
             self.market_prices[instrument] = None
 
+        # historical records of transactions
+        self.historical_positions = dict()
+        for instrument in self.instruments_list:
+            self.historical_positions[instrument] = []
+
         self.realized_pnl = 0
         self.unrealized_pnl = 0
-
-        # open connection and subscribe
-        self.counter = 0
-        self.__subscribe()
-
-    def __subscribe(self):
-        """
-        - open two connections to redis. One is to listen to market data,
-        and buy/sell signals. Another is to write portfolio information.
-        - subscribe some instrument by listening to the channel in Redis.
-        :return:
-        """
-        # open two connections
-        self.sub_wrapper = RedisWrapper(db=AthenaConfig.athena_db_index)
-        self.pub_wrapper = RedisWrapper(db=AthenaConfig.athena_db_index)
-
-        # create a sub.
-        self.sub = self.sub_wrapper.connection.pubsub()
-
-        # channel directory (set in MarketDataHandler
-        sub_instruments_list = ['md:' + inst for inst in self.instruments_list]
-        self.sub.subscribe(sub_instruments_list)
-        self.sub.subscribe(self.strategy_channels)
-
-    def on_message(self, message):
-        """
-
-        :return:
-        """
-        if message['type'] == AthenaProperNames.md_message_type:
-            # on md messages
-            this_instrument = message[AthenaConfig.sql_instrument_field]
-            self.market_prices[this_instrument] = (
-                (float(message[AthenaConfig.sql_ask_field]) +
-                 float(message[AthenaConfig.sql_bid_field])) / 2
-            )
-        if message['type'] == AthenaProperNames.order_message_type:
-            # on buy/sell signal messages
-            self.transact_position(
-                instrument=message['contract'],
-                direction=(
-                    PositionDirection.BOT
-                    if message['direction'] == AthenaProperNames.long
-                    else PositionDirection.SLD
-                ),
-                quantity=message['quantity'],
-                price=message['price'],
-                commission=message['commission'],
-                market_prices=self.market_prices
-            )
-
-        # publish message
-        status = self.make_portfolio_status(self.market_prices)
-        status['update_time'] = message['update_time'] \
-            if message['type'] == 'order' \
-            else message[AthenaConfig.sql_local_dt_field]
-        status['event_type'] = 'update' \
-            if message['type'] == AthenaProperNames.md_message_type \
-            else 'trade'
-        self.publish(status)
-
-        # increment to counter
-        self.counter += 1
-
-    def start(self):
-        """
-        let portfolio start listening.
-        """
-        for message in self.sub.listen():
-            if message['type'] == 'message':
-                str_data = message['data'].decode('utf-8')
-                dict_data = json.loads(str_data)
-                self.on_message(list(dict_data.values())[0])
-
-    def publish(self, dict_message_data):
-        """
-        set hash table in redis and publish message in its own channel.
-        The name of channel is just self.signal_name
-        :param dict_message_data: dictionary, the data to be published
-        :return:
-        """
-        # create hash set object in redis.
-        dict_message_data['type'] = AthenaProperNames.portfolio_message_type
-
-        published_key = append_digits_suffix_for_redis_key(
-            prefix='portfolio',
-            counter=self.counter,
-        )
-        self.pub_wrapper.set_dict(published_key, dict_message_data)
-
-        # serialize json dict to string.
-        published_message = json.dumps({published_key: dict_message_data})
-
-        # publish the message to support other subscriber.
-        self.pub_wrapper.connection.publish(
-            channel=self.pub_channel,
-            message=published_message
-        )
 
     def __reset(self):
         """
@@ -159,25 +64,33 @@ class Portfolio(object):
         self.__reset()
         for instrument in self.positions:
             p = self.positions[instrument]
+            p_hist = self.historical_positions[instrument]
             try:
                 price = market_prices[instrument]
                 p.update_market_value(price)
             except KeyError:
                 print("Last close price of {} is not available.".format(
                     instrument))
+
+            # single instrument
+            p_realized_pnl = p.realized_pnl + sum(
+                [ph['realized_pnl'] for ph in p_hist])
+            p_unrealized_pnl = p.realized_pnl
+
             # sum up PnLs of individual positions.
-            self.unrealized_pnl += p.unrealized_pnl
-            self.realized_pnl += p.realized_pnl
+            self.unrealized_pnl += p_unrealized_pnl
+            self.realized_pnl += p_realized_pnl
 
             # calculate cash effect of this position
-            cash_earned_on_transactions = p.realized_pnl - p.unrealized_pnl
+            cash_earned_on_transactions = p_realized_pnl - p_unrealized_pnl
             self.cash += (cash_earned_on_transactions - p.cost)
 
             # calculate equity effect
             self.equity = self.equity + \
                           p.market_value - p.cost + cash_earned_on_transactions
 
-    def __add_position(self, instrument, direction, quantity, price,
+    def __add_position(self, instrument, transaction_time,
+                       direction, quantity, price,
                        commission, market_prices):
         """
         add new position to portfolio
@@ -185,14 +98,15 @@ class Portfolio(object):
         self.__reset()
         if instrument not in self.positions:
             # make new position
-            position = Position(instrument, direction,
+            position = Position(instrument, transaction_time, direction,
                                 quantity, price, commission)
             self.positions[instrument] = position
             self.update(market_prices)
         else:
             print("{} is already in the position list.".format(instrument))
 
-    def __modify_position(self, instrument, direction, quantity, price,
+    def __modify_position(self, instrument, transaction_time,
+                          direction, quantity, price,
                           commission, market_prices):
         """
         Modify the position when instrument is already in the list.
@@ -205,14 +119,33 @@ class Portfolio(object):
             self.positions[instrument].update_market_value(
                 market_prices[instrument])
             self.update(market_prices)
+
+            # if position quantity is 0, close the position
+            # and add to history
+            if self.positions[instrument].quantity == 0:
+                this_position = self.positions[instrument]
+                self.historical_positions[instrument].append(
+                    {
+                        'direction': this_position.direction,
+                        'realized_pnl': this_position.realized_pnl,
+                        'contract': instrument,
+                        'holding_period': (
+                            transaction_time - this_position.open_time
+                        ),
+                        'total_buy_volume': this_position.bought
+                    }
+                )
+                del self.positions[instrument]
         else:
             print("{} is not in the position list.".format(instrument))
 
-    def transact_position(self, instrument, direction, quantity, price,
+    def transact_position(self, instrument, transaction_time,
+                          direction, quantity, price,
                           commission, market_prices):
         """
         just a wrapper of __add and __modify position methods.
         :param instrument: as is suggested
+        :param transaction_time
         :param direction:
         :param quantity:
         :param price:
@@ -222,11 +155,24 @@ class Portfolio(object):
         :return:
         """
         if instrument not in self.positions:
-            self.__add_position(instrument, direction, quantity, price,
-                                commission, market_prices)
+            self.__add_position(
+                instrument,
+                transaction_time,
+                direction,
+                quantity,
+                price,
+                commission,
+                market_prices
+            )
         else:
-            self.__modify_position(instrument, direction, quantity, price,
-                                   commission, market_prices)
+            self.__modify_position(
+                instrument,
+                transaction_time,
+                direction,
+                quantity, price,
+                commission,
+                market_prices
+            )
 
     def make_portfolio_status(self, market_prices):
         """

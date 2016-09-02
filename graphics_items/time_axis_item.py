@@ -1,8 +1,5 @@
-from datetime import datetime
-
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
-from PyQt4.QtCore import QTime, QTimer
+from PyQt4.QtCore import QTime
 
 __author__ = 'zed'
 
@@ -21,6 +18,7 @@ class TimeAxisItem(pg.AxisItem):
         super(TimeAxisItem, self).__init__(*args, **kwargs)
 
         # set measure
+        self.measure = None
         self.set_measure()
 
     def set_measure(self, measure=60):

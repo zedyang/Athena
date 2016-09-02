@@ -97,21 +97,6 @@ class TestPortfolioBasic(unittest.TestCase):
         self.assertEqual(s['equity'], 10992)
         self.assertEqual(self.my_portfolio.realized_pnl, 992)
 
-    def test_my_portfolio_market_2(self):
-        self.my_portfolio.on_message(self.md_data[0])
-        self.my_portfolio.on_message(self.md_data[1])
-        self.my_portfolio.on_message(
-            {
-                'contract': 'S1',
-                'direction': 'long',
-                'quantity': 100,
-                'commission': 0,
-                'tag': 'order'
-            }
-        )
-        self.my_portfolio.on_message(self.md_data[2])
-        self.my_portfolio.on_message(self.md_data[3])
-
 
 class TestPortfolioBorrowing(unittest.TestCase):
     """

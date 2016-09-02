@@ -17,11 +17,12 @@ class Position(object):
     position (one instrument). It records all BOT\SLD actions and associated prices
     and tracks the PnL on this instrument.
     """
-    def __init__(self, instrument, direction,
+    def __init__(self, instrument, open_time, direction,
                  init_quantity, init_price, init_commission):
         """
         Create the position object.
         :param instrument: The name of instrument
+        :param open_time:
         :param direction: The direction of initial trade,
             a PositionDirection object.
         :param init_quantity: The quantity associated with initial position.
@@ -43,6 +44,7 @@ class Position(object):
         * net_total = total_sold - total_bought, cash inflow is positive.
         """
         self.instrument = instrument
+        self.open_time = open_time
         self.direction = direction
         self.quantity = init_quantity # make positive temporarily,
         # in the end it will have correct sign.

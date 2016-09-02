@@ -2,7 +2,7 @@ import numpy as np
 
 from Athena.settings import AthenaConfig
 from Athena.signals.signal import SignalTemplate
-Kf = AthenaConfig.KLineFields
+Kf = AthenaConfig.HermesKLineFields
 
 __author__ = 'zed'
 
@@ -13,24 +13,22 @@ class TrailingStop(SignalTemplate):
     Keeps track on positions and k-lines, begin to publish when there is
     opened position. Updated on k-line data.
     """
+    signal_name_prefix = 'signal:trailing.stop'
+    param_names = ['instrument', 'target_strategy']
 
-    def __init__(self, sub_channels, target_strategy):
+    def __init__(self, subscribe_list, param_list):
         """
-        constructor.
-        :param sub_channels: list of strings
-        :param tag: string
-        :return:
-        """
-        super(TrailingStop, self).__init__(sub_channels)
-        self.target_strategy = target_strategy
 
-        # set signal names and channels.
+        :param subscribe_list:
+        :param param_list:
+        """
+        super(TrailingStop, self).__init__(subscribe_list)
+        self._map_to_channels(param_list,
+                              suffix=param_list[0])
+
+        # set parameters
         self.tag = 'stop'
-        self.signal_name = 'signal:trailing.stop'
-        self.pub_channel = self.signal_name
-        self.pub_channel_plot = 'plot:' + self.pub_channel
-
-        # whether the signal is tracking
+        self.target_strategy = self.param_dict['target_strategy']
         self.is_tracking = False
 
         # signal list
@@ -92,9 +90,7 @@ class TrailingStop(SignalTemplate):
         }
 
         # publish and print
-        self._publish(to_publish)
-        print('---')
-        print(to_publish)
+        self.publish(to_publish)
 
     def __change_status(self, message):
         """

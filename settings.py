@@ -23,30 +23,134 @@ class AthenaConfig(object):
     sql_pwd = '123456'
 
     sql_historical_db = 'Athena_test_db'
-    sql_test_table = 'md160713'
 
-    class TickFields(object):
-        # proper headers of tick data used in Athena (Python PEP-8)
-        tick_headers = (
-            'trade_day', 'ex_update_time', 'local_update_time', 'category',
-            'contract', 'last_price', 'bid', 'bid_vol', 'ask', 'ask_vol',
-            'average_price', 'highest_price', 'lowest_price', 'pre_close',
-            'open_interest', 'volume'
-        )
-        (day, ex_time, local_time, category, contract, last_price,
-         bid, bid_vol, ask, ask_vol, avg_price, high_price, low_price,
-         pre_close, open_int, volume) = tick_headers
-
-    class KLineFields(object):
-        # proper headers of kline data used in Athena (Python PEP-8)
+    class SQLKlineFields(object):
+        # table headers in SQL
         kline_headers = (
-            'ex_open_time', 'open_time', 'end_time',
-            'contract', 'open', 'high', 'low', 'close', 'volume',
-            'open_interest', 'duration', 'duration_specifier', 'count'
+            'RowId',
+            'TradingDay',
+            'ExUpdateTime',
+            'LocalUpdateTime',
+            'ExchangeID',
+            'Category',
+            'Symbol',
+            'TimeFrame',
+            'Open',
+            'High',
+            'Low',
+            'Close',
+            'Volume',
+            'Turnover',
+            'OpenInterest',
+            'Average',
+            'TotalVolume',
+            'TotalTurnover',
+            'DayAveragePrice',
+            'OpenTime',
+            'HighTime',
+            'LowTime',
+            'CloseTime',
+            'Rank',
+            'UniqueIndex'
         )
-        (ex_open_time, open_time, end_time, contract,
-         open_price, high_price, low_price, close_price, volume,
-         open_int, duration, duration_specifier, count) = kline_headers
+        (id, day, ex_update_time, update_time, exchange,
+         category, contract, duration,
+         open_price, high_price, low_price, close_price,
+         volume, turnover, open_interest, average_price,
+         total_volume, total_turnover, daily_avg_price,
+         open_time, high_time, low_time, close_time,
+         rank, index) = kline_headers
+        ohlc = (open_price, high_price, low_price, close_price)
+
+    class SQLTickFields(object):
+        # table headers in SQL
+        tick_headers = (
+            'RowId',
+            'TradingDay',
+            'ExUpdateTime',
+            'LocalUpdateTime',
+            'ExchangeID',
+            'Category',
+            'Symbol',
+            'LastPrice',
+            'BidPrice1',
+            'BidPrice2',
+            'BidPrice3',
+            'BidPrice4',
+            'BidPrice5',
+            'BidPrice6',
+            'BidPrice7',
+            'BidPrice8',
+            'BidPrice9',
+            'BidPrice10',
+            'BidVolume1',
+            'BidVolume2',
+            'BidVolume3',
+            'BidVolume4',
+            'BidVolume5',
+            'BidVolume6',
+            'BidVolume7',
+            'BidVolume8',
+            'BidVolume9',
+            'BidVolume10',
+            'AskPrice1',
+            'AskPrice2',
+            'AskPrice3',
+            'AskPrice4',
+            'AskPrice5',
+            'AskPrice6',
+            'AskPrice7',
+            'AskPrice8',
+            'AskPrice9',
+            'AskPrice10',
+            'AskVolume1',
+            'AskVolume2',
+            'AskVolume3',
+            'AskVolume4',
+            'AskVolume5',
+            'AskVolume6',
+            'AskVolume7',
+            'AskVolume8',
+            'AskVolume9',
+            'AskVolume10',
+            'AveragePrice',
+            'HighestPrice',
+            'LowestPrice',
+            'PreClosePrice',
+            'OpenInterest',
+            'Volume',
+            'Turnover',
+            'Rank',
+            'UniqueIndex'
+        )
+        (id, day, ex_update_time, local_update_time, exchange,
+         category, contract, last_price,
+         bid_1, bid_2, bid_3, bid_4, bid_5,
+         bid_6, bid_7, bid_8, bid_9, bid_10,
+         bid_vol_1, bid_vol_2, bid_vol_3, bid_vol_4, bid_vol_5,
+         bid_vol_6, bid_vol_7, bid_vol_8, bid_vol_9, bid_vol_10,
+         ask_1, ask_2, ask_3, ask_4, ask_5,
+         ask_6, ask_7, ask_8, ask_9, ask_10,
+         ask_vol_1, ask_vol_2, ask_vol_3, ask_vol_4, ask_vol_5,
+         ask_vol_6, ask_vol_7, ask_vol_8, ask_vol_9, ask_vol_10,
+         average_price, highest_price, lowest_price, preclose_price,
+         open_int, volume, turnover, rank, index) = tick_headers
+
+    class OrderFields(object):
+        # proper headers of order data used in Athena (Python PEP-8)
+        athena_order_headers = (
+            'direction',
+            'type',
+            'subtype',
+            'quantity',
+            'price',
+            'contract',
+            'commission',
+            'update_time',
+            'bar_count'
+        )
+        (direction, type, subtype, quantity, price,
+         contract, commission, update_time, bar_count) = athena_order_headers
 
     dt_format = '%Y-%m-%d %H:%M:%S'
     sql_storage_dt_format = '%Y-%m-%d %H:%M:%S.%f'
@@ -76,7 +180,8 @@ class AthenaConfig(object):
 
     # The following section is to configure Redis database connection.
     # ---------------------------------------------------------------------
-    redis_host = '127.0.0.1'
+    redis_host_local = '127.0.0.1'
+    redis_host_remote_1 = '10.88.26.26'
     redis_port = 6379
 
     hist_stream_db_index = 3
@@ -94,31 +199,289 @@ class AthenaConfig(object):
     # ---------------------------------------------------------------------
     class HermesTickFields(object):
         # headers of hermes raw tick data.
+
         hermes_tick_headers = (
-            'day', 'systime', 'subtime', 'lastprice',
-            'volume', 'openinterest', 'bid1', 'bidvol1', 'ask1', 'askvol1'
+            'day',
+            'systime',
+            'subtime',
+            'updatems',
+            'exchangeid',
+            'contract',
+            'lastprice',
+            'bid1',
+            'bid2',
+            'bid3',
+            'bid4',
+            'bid5',
+            'bid6',
+            'bid7',
+            'bid8',
+            'bid9',
+            'bid10',
+            'bidvol1',
+            'bidvol2',
+            'bidvol3',
+            'bidvol4',
+            'bidvol5',
+            'bidvol6',
+            'bidvol7',
+            'bidvol8',
+            'bidvol9',
+            'bidvol10',
+            'ask1',
+            'ask2',
+            'ask3',
+            'ask4',
+            'ask5',
+            'ask6',
+            'ask7',
+            'ask8',
+            'ask9',
+            'ask10',
+            'askvol1',
+            'askvol2',
+            'askvol3',
+            'askvol4',
+            'askvol5',
+            'askvol6',
+            'askvol7',
+            'askvol8',
+            'askvol9',
+            'askvol10',
+            'avgprx',
+            'openprx',
+            'highprx',
+            'lowprx',
+            'closeprx',
+            'clearprx',
+            'preclearprx',
+            'precloseprx',
+            'openinterest',
+            'preopeninterest',
+            'volume',
+            'turnover',
+            'key'
         )
-        (day, ex_time, local_time, last_price,
-         volume, open_int, bid, bid_vol, ask, ask_vol) = hermes_tick_headers
+        (
+            day,
+            ex_time,
+            local_time,
+            update_ms,
+            exchange,
+            contract,
+            last_price,
+            bid_1,
+            bid_2,
+            bid_3,
+            bid_4,
+            bid_5,
+            bid_6,
+            bid_7,
+            bid_8,
+            bid_9,
+            bid_10,
+            bid_vol_1,
+            bid_vol_2,
+            bid_vol_3,
+            bid_vol_4,
+            bid_vol_5,
+            bid_vol_6,
+            bid_vol_7,
+            bid_vol_8,
+            bid_vol_9,
+            bid_vol_10,
+            ask_1,
+            ask_2,
+            ask_3,
+            ask_4,
+            ask_5,
+            ask_6,
+            ask_7,
+            ask_8,
+            ask_9,
+            ask_10,
+            ask_vol_1,
+            ask_vol_2,
+            ask_vol_3,
+            ask_vol_4,
+            ask_vol_5,
+            ask_vol_6,
+            ask_vol_7,
+            ask_vol_8,
+            ask_vol_9,
+            ask_vol_10,
+            average_price,
+            open_price,
+            high_price,
+            low_price,
+            close_price,
+            clear_price,
+            pre_clear_price,
+            pre_close_price,
+            open_interest,
+            pre_open_interest,
+            volume,
+            turnover,
+            key
+        ) = hermes_tick_headers
+
+        asks = (
+            ask_1,
+            ask_2,
+            ask_3,
+            ask_4,
+            ask_5,
+            ask_6,
+            ask_7,
+            ask_8,
+            ask_9,
+            ask_10,
+        )
+
+        bids = (
+            bid_1,
+            bid_2,
+            bid_3,
+            bid_4,
+            bid_5,
+            bid_6,
+            bid_7,
+            bid_8,
+            bid_9,
+            bid_10,
+        )
+
+        ask_vols = (
+            ask_vol_1,
+            ask_vol_2,
+            ask_vol_3,
+            ask_vol_4,
+            ask_vol_5,
+            ask_vol_6,
+            ask_vol_7,
+            ask_vol_8,
+            ask_vol_9,
+            ask_vol_10,
+        )
+
+        bid_vols = (
+            bid_vol_1,
+            bid_vol_2,
+            bid_vol_3,
+            bid_vol_4,
+            bid_vol_5,
+            bid_vol_6,
+            bid_vol_7,
+            bid_vol_8,
+            bid_vol_9,
+            bid_vol_10,
+        )
+
+        floats = asks + bids + (last_price, average_price, open_price,
+                                high_price, low_price, close_price,
+                                clear_price, pre_clear_price, pre_close_price,)
+
+        integers = ask_vols + bid_vols + (volume, update_ms, turnover,
+                                          open_interest, pre_open_interest,)
 
     class HermesKLineFields(object):
         # headers of hermes raw k-line data
+
         hermes_kline_headers = (
-            'openwndtime', 'opensystime', 'dur', 'open', 'close',
-            'high', 'low', 'volume', 'openinterest'
+            'day',
+            'updatetime',
+            'localtime',
+            'exchangeid',
+            'contract',
+            'dur',
+            'dur_specifier',
+            'openprx',
+            'highprx',
+            'lowprx',
+            'closeprx',
+            'volume',
+            'turnover',
+            'openinterest',
+            'avgprx',
+            'precloseprx',
+            'totalvolume',
+            'totalturnover',
+            'opentime',
+            'hightime',
+            'lowtime',
+            'closetime',
+            'key',
+            'count'
         )
-        (open_time, ex_open_time, duration, open_price, close_price,
-         high_price, low_price, volume, open_int) = hermes_kline_headers
+        (
+            day,
+            ex_time,
+            local_time,
+            exchange,
+            contract,
+            duration,
+            duration_specifier,
+            open_price,
+            high_price,
+            low_price,
+            close_price,
+            volume,
+            turnover,
+            open_interest,
+            average_price,
+            pre_close_price,
+            total_volume,
+            total_turnover,
+            open_time,
+            high_time,
+            low_time,
+            close_time,
+            key,
+            count
+        ) = hermes_kline_headers
+
+        ohlc = (
+            open_price,
+            high_price,
+            low_price,
+            close_price
+        )
+
+        ohlc_time = (
+            open_time,
+            high_time,
+            low_time,
+            close_time
+        )
+
+        floats = ohlc + (average_price, pre_close_price,)
+        integers = (volume, turnover, total_volume, total_turnover,
+                    open_interest, duration)
+        times = (ex_time, local_time, open_time,
+                 high_time, low_time, close_time, 'timeframe')
 
     # duration specifiers
-    hermes_kl_dur = ['clock', '1m', '3m', '5m', '10m', '15m']
+    hermes_kl_dur = [
+        'clock',
+        '1s', '3s', '5s', '10s', '15s', '30s',
+        '1m', '3m', '5m', '10m', '15m', '30m',
+        '1h', '3h'
+    ]
     hermes_kl_dur_to_seconds = {
-        'clock': 3,
+        '1s': 1,
+        '3s': 3,
+        '5s': 5,
+        '10s': 10,
+        '15s': 15,
+        '30s': 30,
         '1m': 60,
         '3m': 180,
         '5m': 300,
         '10m': 600,
-        '15m': 900
+        '15m': 900,
+        '30m': 1800,
+        '1h': 3600,
+        '3h': 10800
     }
 
     # the inverse mapping
@@ -134,6 +497,8 @@ class AthenaConfig(object):
         nanhua_kl = 'kl.nanhua.'
         ctp_md = 'md.ctpnow.'
         ctp_kl = 'kl.ctpnow.'
+        uft_md = 'md.uftreal.'
+        uft_kl = 'kl.uftreal.'
 
     class HermesInstrumentsList(object):
         # Instrument list that is included in different APIs
@@ -156,7 +521,6 @@ class AthenaConfig(object):
         ]
 
         ctp = [
-            'au1608',
             'au1609',
             'au1610',
             'au1611',
@@ -177,13 +541,12 @@ class AthenaConfig(object):
             'ag1703',
             'ag1704',
             'ag1705',
-            'ag1706'
+            'ag1706',
         ]
 
         uft = ctp
 
         nanhua = [
-            'GC1608',
             'GC1609',
             'GC1610',
             'GC1611',
@@ -217,7 +580,7 @@ class AthenaConfig(object):
 
     # create instrument symbol -> md and kline data directory mapping.
     associative_list_md = (
-        (HermesInstrumentsList.ctp, HermesMdDirectory.ctp_md),
+        (HermesInstrumentsList.uft, HermesMdDirectory.uft_md),
         (HermesInstrumentsList.ksd, HermesMdDirectory.ksd_md),
         (HermesInstrumentsList.nanhua, HermesMdDirectory.nanhua_md)
     )
@@ -226,7 +589,7 @@ class AthenaConfig(object):
     hermes_md_mapping = map_to_md_dir(associative_list_md)
 
     associative_list_kl = (
-        (HermesInstrumentsList.ctp, HermesMdDirectory.ctp_kl),
+        (HermesInstrumentsList.uft, HermesMdDirectory.uft_kl),
         (HermesInstrumentsList.ksd, HermesMdDirectory.ksd_kl),
         (HermesInstrumentsList.nanhua, HermesMdDirectory.nanhua_kl)
     )
@@ -238,11 +601,20 @@ class AthenaConfig(object):
 
     # create instrument symbol -> exchange mapping.
     associative_list_exchange = (
-        (HermesInstrumentsList.ctp, 'SHFE'),
+        (HermesInstrumentsList.uft, 'SHFE'),
         (HermesInstrumentsList.ksd, 'SGE'),
         (HermesInstrumentsList.nanhua, 'CME')
     )
     hermes_exchange_mapping = create_equiv_classes(associative_list_exchange)
+
+    # minimum price change
+    hermes_tick_size_mapping = {
+        'GC1608': 0.1,
+        'GC1612': 0.1,
+        'Au(T+D)': 0.01,
+        'Ag(T+D)': 1,
+        'au1612': 0.01
+    }
 
     # create instrument symbol -> category mapping
     hermes_category_mapping = dict()
@@ -276,19 +648,4 @@ class AthenaConfig(object):
         return AthenaConfig.redis_md_dir + '_({})_{}_{}'.format(
             ','.join(instrument_list), begin_str, end_str)
 
-
-class AthenaProperNames(object):
-    """
-    A list of proper names that are frequently used in this module.
-    """
-    long = 'long'
-    short = 'short'
-
-    bid = 'bid'
-    ask = 'ask'
-
-    md_message_type = 'md'
-    order_message_type = 'order'
-    signal_message_type = 'signal'
-    portfolio_message_type = 'portfolio'
 

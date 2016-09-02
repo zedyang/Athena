@@ -2,8 +2,8 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
 from Athena.settings import AthenaConfig
-from Athena.db_wrappers.redis_wrapper import RedisWrapper
-Kf = AthenaConfig.KLineFields
+from Athena.data_handler.redis_wrapper import RedisWrapper
+Kf = AthenaConfig.HermesKLineFields
 
 __author__ = 'zed'
 
@@ -19,6 +19,7 @@ class CandlestickGraphItem(pg.GraphicsObject):
         self.ohlc_data = []
 
         self.sub_channel = sub_channel
+        print(sub_channel, '------')
         self.__subscribe()
 
         # shared label
@@ -93,12 +94,63 @@ class CandlestickGraphItem(pg.GraphicsObject):
                 )
 
         # draw orders
+        vb_range = self.parentWidget().state['targetRange']
+        x_range, y_range = vb_range[0][1] - vb_range[0][0], \
+                           vb_range[1][1] - vb_range[1][0]
+        ratio = y_range / x_range * 1.82
+
         for (update_time, direction, price, t) in self.buy_sell_data:
             p.setPen(pg.mkPen('y'))
             p.drawLine(
                 QtCore.QPointF(t-0.4, price),
                 QtCore.QPointF(t+0.4, price)
             )
+
+            # draw marker
+            if direction == 'short':
+                # sell signal
+                p.setPen(pg.mkPen('r'))
+                try:
+                    high_price = self.ohlc_data[t][3]
+                    p.drawLine(
+                        QtCore.QPointF(t-0.3, high_price+0.9*ratio),
+                        QtCore.QPointF(t+0.3, high_price+0.9*ratio)
+                    )
+                    p.drawLine(
+                        QtCore.QPointF(t, high_price + 0.3*ratio),
+                        QtCore.QPointF(t-0.3, high_price + 0.9*ratio)
+                    )
+                    p.drawLine(
+                        QtCore.QPointF(t, high_price + 0.3*ratio),
+                        QtCore.QPointF(t+0.3, high_price + 0.9*ratio)
+                    )
+                except IndexError:
+                    # ohlc might be updated slower than order
+                    # under which occasion there will be no self.ohlc[t]
+                    # hence we catch index error.
+                    pass
+            elif direction == 'long':
+                # buy signal
+                p.setPen(pg.mkPen('g'))
+                try:
+                    low_price = self.ohlc_data[t][4]
+                    p.drawLine(
+                        QtCore.QPointF(t-0.3, low_price-0.9*ratio),
+                        QtCore.QPointF(t+0.3, low_price-0.9*ratio)
+                    )
+                    p.drawLine(
+                        QtCore.QPointF(t, low_price-0.3*ratio),
+                        QtCore.QPointF(t-0.3, low_price-0.9*ratio)
+                    )
+                    p.drawLine(
+                        QtCore.QPointF(t, low_price-0.3*ratio),
+                        QtCore.QPointF(t+0.3, low_price-0.9*ratio)
+                    )
+                except IndexError:
+                    pass
+
+            else: pass
+
         # connect open/close positions
         for i in range(len(self.buy_sell_data))[1::2]:
             p.setPen(pg.mkPen('y', style=QtCore.Qt.DashLine))
@@ -134,9 +186,11 @@ class CandlestickGraphItem(pg.GraphicsObject):
 
         for dict_key in keys_to_update_bars:
             dict_data = self.sub_wrapper.get_dict(dict_key)
+
             # append row to ohlc data.
             row = [
-                dict_data[Kf.open_time], dict_data[Kf.end_time],
+                dict_data[Kf.open_time],
+                dict_data[Kf.close_time],
                 float(dict_data[Kf.open_price]),
                 float(dict_data[Kf.high_price]),
                 float(dict_data[Kf.low_price]),
@@ -155,6 +209,7 @@ class CandlestickGraphItem(pg.GraphicsObject):
 
             for dict_key in keys_to_update_orders:
                 dict_data = self.sub_wrapper.get_dict(dict_key)
+
                 # append row
                 row = [
                     dict_data['update_time'],
@@ -162,7 +217,8 @@ class CandlestickGraphItem(pg.GraphicsObject):
                     float(dict_data['price']),
                     int(dict_data['bar_count'])
                 ]
-                self.buy_sell_data.append(row)
+                if row[1] in ['long', 'short']:
+                    self.buy_sell_data.append(row)
                 # delete key
                 self.sub_wrapper.connection.delete(dict_key)
 

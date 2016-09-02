@@ -1,9 +1,8 @@
 import pyqtgraph as pg
-import numpy as np
 from pyqtgraph.Qt import QtCore, QtGui
 
 from Athena.settings import AthenaConfig
-from Athena.db_wrappers.redis_wrapper import RedisWrapper
+from Athena.data_handler.redis_wrapper import RedisWrapper
 
 __author__ = 'zed'
 
@@ -99,7 +98,7 @@ class CurveGraphItem(pg.GraphicsObject):
         # donchian
         self.added_donchian = False
         self.donchian_sub_channel = None
-        self.donchian_window = None
+        self.donchian_window_widths = None
         self.curve_data['donchian'] = []
         # --------------------------------------------------------
         # ma batch
@@ -116,15 +115,16 @@ class CurveGraphItem(pg.GraphicsObject):
         """
         self.sub_wrapper = RedisWrapper(db=AthenaConfig.athena_db_index)
 
-    def add_donchian(self, sub_channel, window):
+    def add_donchian(self, sub_channel, window_widths):
         """
         add donchian channel to the graph.
         :param sub_channel: string
-        :param window: integer
+        :param window_widths: tuple[2] of integers,
+            (up_width, down_width)
         :return:
         """
         self.donchian_sub_channel = sub_channel
-        self.donchian_window = window
+        self.donchian_window_widths = window_widths
         self.added_donchian = True
 
     def add_ma(self, sub_channel, window_widths):
@@ -155,7 +155,7 @@ class CurveGraphItem(pg.GraphicsObject):
             style=CurveGraphItem.plot_patterns['donchian']['style']
         ))
         p.setOpacity(CurveGraphItem.plot_patterns['donchian']['alpha'])
-        for i in range(self.donchian_window,
+        for i in range(max(self.donchian_window_widths),
                        len(self.curve_data['donchian'])):
             # upper line
             p.drawLine(
@@ -167,9 +167,9 @@ class CurveGraphItem(pg.GraphicsObject):
             # lower line
             p.drawLine(
                 QtCore.QPointF(self.curve_data['donchian'][i-1][-1],
-                               self.curve_data['donchian'][i-1][3]),
+                               self.curve_data['donchian'][i-1][2]),
                 QtCore.QPointF(self.curve_data['donchian'][i][-1],
-                               self.curve_data['donchian'][i][3])
+                               self.curve_data['donchian'][i][2])
             )
 
         # --------------------------------------------------------
@@ -219,9 +219,12 @@ class CurveGraphItem(pg.GraphicsObject):
                 # append row
                 row = [
                     dict_data['open_time'],
-                    float(dict_data['up']),
-                    float(dict_data['middle']),
-                    float(dict_data['down']),
+                    float(
+                        dict_data['up_'+str(self.donchian_window_widths[0])]
+                    ),
+                    float(
+                        dict_data['down_'+str(self.donchian_window_widths[1])]
+                    ),
                     int(dict_data['count']),
                 ]
                 self.curve_data['donchian'].append(row)
@@ -254,7 +257,7 @@ class CurveGraphItem(pg.GraphicsObject):
     def update_label_on_mouse_move(self, mouse_point_x):
         """
         called in on_mouse_move method in AthenaMainWindowController.
-        :param event:
+        :param mouse_point_x:
         :return:
         """
         index = -round(mouse_point_x)
@@ -267,15 +270,16 @@ class CurveGraphItem(pg.GraphicsObject):
 
             string_1 = """
             <span style='font-size: 13pt' style='color: green'>
-            DONCHIAN.{window}
+            DONCHIAN.U{hh}.D{ll}
             </span> =
             <span style='font-size: 13pt' style='color: green'>
             {up}, {down}
             </span>  |
             """.format(
-                window=self.donchian_window,
+                hh=self.donchian_window_widths[0],
+                ll=self.donchian_window_widths[1],
                 up=arr[1],
-                down=arr[3]
+                down=arr[2]
             )
         else:
             string_1 = ''

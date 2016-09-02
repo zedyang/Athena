@@ -3,6 +3,7 @@ import numpy as np
 from Athena.settings import AthenaConfig, AthenaProperNames
 from Athena.containers import OrderEvent
 from Athena.strategies.strategy import StrategyTemplate
+Kf = AthenaConfig.KLineFields
 
 __author__ = 'zed'
 
@@ -12,9 +13,9 @@ class MACrossStrategy(StrategyTemplate):
 
     """
     tag_ma = 'ma'
-    tag_bar = 'bar'
+    tag_bar = 'kl'
 
-    def __init__(self, subscribe_list):
+    def __init__(self, subscribe_list, ma_short, ma_long):
         """
 
         """
@@ -30,6 +31,7 @@ class MACrossStrategy(StrategyTemplate):
         self.strategy_name = 'strategy:ma_cross'
         self.pub_channel = self.strategy_name
         self.plot_data_channel = 'plot:' + self.pub_channel
+        self.table_data_channel = 'table:' + self.pub_channel
 
     def on_message(self, message):
         """
@@ -37,10 +39,12 @@ class MACrossStrategy(StrategyTemplate):
         :param message:
         :return:
         """
-        if 'tag' in message:
+        if message['tag'] == 'ma':
             self.signals['short'] = float(message['36'])
             self.signals['long'] = float(message['48'])
-        else:   # on bars
+
+        elif message['tag'] == 'kl':
+
             if self.signals['long']:  # when ma long has data
 
                 if not self.has_position and \
@@ -49,31 +53,34 @@ class MACrossStrategy(StrategyTemplate):
                     # create and publish order event.
                     order = OrderEvent(
                         direction=AthenaProperNames.long,
+                        subtype='open_long',
                         quantity=10,
-                        contract=message[AthenaConfig.sql_instrument_field],
-                        price=message['close'],
-                        update_time=message['open_time'],
+                        contract=message[Kf.contract],
+                        price=message[Kf.close_price],
+                        update_time=message[Kf.end_time],
                         commission=0,
                         bar_count=message['count']
                     )
+
                     self.publish(order, plot=True)
                     self.has_position = True
-                    self.counter += 1
 
                 if self.has_position and \
                         self.signals['short'] < (
                         self.signals['long']):
                     order = OrderEvent(
-                        direction=AthenaProperNames.short ,
+                        direction=AthenaProperNames.short,
+                        subtype='close',
                         quantity=10,
-                        contract=message[AthenaConfig.sql_instrument_field],
-                        price=message['close'],
-                        update_time=message['open_time'],
+                        contract=message[Kf.contract],
+                        price=message[Kf.close_price],
+                        update_time=message[Kf.end_time],
                         commission=0,
                         bar_count = message['count']
                     )
+
                     self.publish(order, plot=True)
                     self.has_position = False
-                    self.counter += 1
+
 
 
